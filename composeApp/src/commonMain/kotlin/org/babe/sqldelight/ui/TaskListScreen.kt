@@ -1,11 +1,12 @@
 package org.babe.sqldelight.ui
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -13,10 +14,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import org.babe.sqldelight.data.model.Task
-import org.babe.sqldelight.ui.components.TaskCard
+import org.babe.sqldelight.ui.components.*
 import org.babe.sqldelight.ui.theme.AppColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,84 +34,172 @@ fun TaskListScreen(
     val completedTasks = tasks.count { it.done }
     val totalTasks = tasks.size
     val progressPercentage = if (totalTasks > 0) (completedTasks.toFloat() / totalTasks) else 0f
+    
+    var isAddPressed by remember { mutableStateOf(false) }
+    var showCelebration by remember { mutableStateOf(false) }
+    
+    // Animation de célébration quand toutes les tâches sont terminées
+    LaunchedEffect(progressPercentage) {
+        if (progressPercentage == 1f && totalTasks > 0) {
+            showCelebration = true
+            delay(3000)
+            showCelebration = false
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(AppColors.Background)
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        AppColors.Background,
+                        AppColors.BackgroundSecondary.copy(alpha = 0.3f)
+                    )
+                )
+            )
     ) {
-        // Header avec statistiques
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = AppColors.Surface,
-            shadowElevation = 4.dp
+        // Header moderne avec glassmorphism
+        GlassmorphismCard(
+            modifier = Modifier.fillMaxWidth()
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(24.dp)
             ) {
-                // Titre principal
-                Text(
-                    text = "Mes Tâches",
-                    style = MaterialTheme.typography.displaySmall,
-                    color = AppColors.Neutral900,
-                    fontWeight = FontWeight.Bold
-                )
+                // Titre avec animation
+                AnimatedContent(
+                    targetState = if (showCelebration) "🎉 Félicitations !" else "Mes Tâches",
+                    transitionSpec = {
+                        slideInVertically { -it } + fadeIn() togetherWith
+                        slideOutVertically { it } + fadeOut()
+                    },
+                    label = "header_title"
+                ) { title ->
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.displaySmall,
+                        color = if (showCelebration) AppColors.Success600 else AppColors.Neutral900,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
                 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(20.dp))
                 
-                // Statistiques
+                // Statistiques avec animations
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(
-                            text = "$completedTasks/$totalTasks terminées",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = AppColors.Neutral700,
-                            fontWeight = FontWeight.Medium
-                        )
+                        AnimatedContent(
+                            targetState = "$completedTasks/$totalTasks terminées",
+                            transitionSpec = {
+                                slideInVertically { it } + fadeIn() togetherWith
+                                slideOutVertically { -it } + fadeOut()
+                            },
+                            label = "stats_text"
+                        ) { stats ->
+                            Text(
+                                text = stats,
+                                style = MaterialTheme.typography.titleLarge,
+                                color = AppColors.Neutral800,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                         
                         if (totalTasks > 0) {
-                            Text(
-                                text = "${(progressPercentage * 100).toInt()}% de progression",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = AppColors.Neutral600
-                            )
+                            AnimatedContent(
+                                targetState = "${(progressPercentage * 100).toInt()}% de progression",
+                                transitionSpec = {
+                                    slideInVertically { it } + fadeIn() togetherWith
+                                    slideOutVertically { -it } + fadeOut()
+                                },
+                                label = "progress_text"
+                            ) { progress ->
+                                Text(
+                                    text = progress,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = AppColors.Neutral600
+                                )
+                            }
                         }
                     }
                     
-                    // Indicateur de progression circulaire
+                    // Indicateur de progression circulaire animé
                     if (totalTasks > 0) {
                         Box(
-                            modifier = Modifier.size(48.dp),
+                            modifier = Modifier.size(64.dp),
                             contentAlignment = Alignment.Center
                         ) {
+                            val animatedProgress by animateFloatAsState(
+                                targetValue = progressPercentage,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessLow
+                                ),
+                                label = "progress_animation"
+                            )
+                            
                             CircularProgressIndicator(
-                                progress = { progressPercentage },
+                                progress = { animatedProgress },
                                 modifier = Modifier.fillMaxSize(),
-                                color = AppColors.Success500,
-                                strokeWidth = 4.dp,
+                                color = if (progressPercentage == 1f) AppColors.Success500 else AppColors.Primary500,
+                                strokeWidth = 6.dp,
                                 trackColor = AppColors.Neutral200
                             )
-                            Text(
-                                text = "${(progressPercentage * 100).toInt()}%",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = AppColors.Neutral700,
-                                fontWeight = FontWeight.Medium
-                            )
+                            
+                            AnimatedContent(
+                                targetState = "${(animatedProgress * 100).toInt()}%",
+                                transitionSpec = {
+                                    scaleIn() + fadeIn() togetherWith scaleOut() + fadeOut()
+                                },
+                                label = "progress_percentage"
+                            ) { percentage ->
+                                Text(
+                                    text = percentage,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (progressPercentage == 1f) AppColors.Success600 else AppColors.Primary600,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
+                }
+                
+                // Barre de progression linéaire
+                if (totalTasks > 0) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    val animatedLinearProgress by animateFloatAsState(
+                        targetValue = progressPercentage,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow
+                        ),
+                        label = "linear_progress"
+                    )
+                    
+                    LinearProgressIndicator(
+                        progress = { animatedLinearProgress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        color = if (progressPercentage == 1f) AppColors.Success500 else AppColors.Primary500,
+                        trackColor = AppColors.Neutral200
+                    )
                 }
             }
         }
         
+        Spacer(modifier = Modifier.height(16.dp))
+        
         // Contenu principal
         if (tasks.isEmpty()) {
-            // État vide amélioré
+            // État vide avec animation
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -117,78 +209,98 @@ fun TaskListScreen(
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Icône d'état vide
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .clip(CircleShape)
-                            .background(AppColors.Primary100),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "📝",
-                            style = MaterialTheme.typography.displayMedium
-                        )
-                    }
+                    // Icône animée d'état vide
+                    PulsingIcon(
+                        icon = "📝",
+                        modifier = Modifier.size(80.dp),
+                        color = AppColors.Primary400
+                    )
                     
                     Spacer(modifier = Modifier.height(24.dp))
                     
                     Text(
                         text = "Aucune tâche pour le moment",
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.headlineMedium,
                         color = AppColors.Neutral800,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.Bold
                     )
                     
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     
                     Text(
-                        text = "Commencez par créer votre première tâche",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = AppColors.Neutral600
+                        text = "Commencez par créer votre première tâche\net organisez votre journée",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = AppColors.Neutral600,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                     
                     Spacer(modifier = Modifier.height(32.dp))
                     
+                    // Bouton d'action principal avec animation
                     Button(
                         onClick = onAdd,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AppColors.Primary600,
-                            contentColor = AppColors.Surface
+                            contentColor = Color.White
                         ),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.padding(horizontal = 24.dp)
-                    ) {
-                        Text(
-                            text = "✨ Créer ma première tâche",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier
+                            .padding(horizontal = 24.dp)
+                            .height(56.dp),
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 8.dp,
+                            pressedElevation = 4.dp
                         )
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = "✨",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = "Créer ma première tâche",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
             }
         } else {
-            // Liste des tâches
+            // Liste des tâches avec animations
             LazyColumn(
-                contentPadding = PaddingValues(24.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                items(
+                itemsIndexed(
                     items = tasks,
-                    key = { it.id }
-                ) { task ->
+                    key = { _, task -> task.id }
+                ) { index, task ->
                     AnimatedVisibility(
                         visible = true,
                         enter = slideInVertically(
-                            animationSpec = tween(300),
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            ),
                             initialOffsetY = { it / 2 }
-                        ) + fadeIn(animationSpec = tween(300)),
-                        exit = slideOutVertically(
-                            animationSpec = tween(300),
-                            targetOffsetY = { -it / 2 }
-                        ) + fadeOut(animationSpec = tween(300))
+                        ) + fadeIn(
+                            animationSpec = tween(
+                                durationMillis = 300,
+                                delayMillis = index * 50
+                            )
+                        ),
+                        exit = slideOutHorizontally(
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            ),
+                            targetOffsetX = { -it }
+                        ) + fadeOut(animationSpec = tween(200))
                     ) {
                         TaskCard(
                             task = task,
@@ -197,10 +309,15 @@ fun TaskListScreen(
                         )
                     }
                 }
+                
+                // Espacement pour le FAB
+                item {
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
             }
         }
         
-        // Bouton d'ajout flottant
+        // Bouton d'ajout flottant moderne
         if (tasks.isNotEmpty()) {
             Box(
                 modifier = Modifier
@@ -209,18 +326,32 @@ fun TaskListScreen(
                 contentAlignment = Alignment.Center
             ) {
                 FloatingActionButton(
-                    onClick = onAdd,
+                    onClick = {
+                        isAddPressed = true
+                        onAdd()
+                    },
                     containerColor = AppColors.Primary600,
-                    contentColor = AppColors.Surface,
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.size(56.dp)
+                    contentColor = Color.White,
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.size(64.dp),
+                    elevation = FloatingActionButtonDefaults.elevation(
+                        defaultElevation = 12.dp,
+                        pressedElevation = 6.dp
+                    )
                 ) {
-                    Text(
-                        text = "+",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
+                    AnimatedAddIcon(
+                        isPressed = isAddPressed,
+                        modifier = Modifier.size(32.dp)
                     )
                 }
+            }
+        }
+        
+        // Reset de l'état pressed
+        LaunchedEffect(isAddPressed) {
+            if (isAddPressed) {
+                delay(150)
+                isAddPressed = false
             }
         }
     }
